@@ -1,14 +1,20 @@
 FROM kasmweb/chrome:1.16.0
 
-# Set VNC password
+# Set Render's expected environment variable
+ENV PORT=10000
+ENV VNC_PORT=$PORT
 ENV VNC_PW=password
 
-# Disable internal SSL (Render provides SSL)
-ENV SSL_ONLY=false
+# Expose Render's dynamic port (default is 10000)
+EXPOSE $PORT
 
-# Expose noVNC port (Render will proxy to this)
-EXPOSE 6901
+# Override supervisord config to use the PORT
+# We'll symlink 6901 config to point to $PORT
+RUN sed -i "s/6901/${PORT}/g" /dockerstartup/vnc_startup.sh \
+  && sed -i "s/6901/${PORT}/g" /etc/supervisor/conf.d/supervisord.conf
 
-# Fix noVNC binding and start
-CMD sed -i 's/--listen 127.0.0.1/--listen 0.0.0.0/' /dockerstartup/vnc_startup.sh && \
-    /dockerstartup/vnc_startup.sh
+# Set default user/password
+ENV KASM_USER=kasm_user
+ENV KASM_PASSWORD=${VNC_PW}
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
